@@ -1,0 +1,20 @@
+{
+  "name": "nodetest",
+  "version": "1.0.0",
+  "description": "Basic tools to test a node project",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo "Error: no test specified" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/josecanciani/nodetest.git"
+  },
+  "author": "Jose Canciani",
+  "license": "ISC",
+  "peerDependencies": {
+    "eslint": "*",
+    "jsdoc": "*"
+  }
+}
