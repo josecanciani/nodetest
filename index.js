@@ -19,15 +19,34 @@ export class Orchestrator extends EventEmitter {
         this.lintOnly = process.argv.includes('--lint-only');
         this.forceClean = process.argv.includes('--force');
         this.specificFiles = this.parseFilesArg();
-        this.linters = [];
-        
-        // Register default linters
-        this.on('init', () => {
-            this.addLinter(runJsdoc);
-            this.addLinter(runEslint);
-            this.addLinter(runJsdocObjectTypeCheck);
-            this.addLinter(runDocumentationCheck);
-        });
+        this.preTestCallbacks = [];
+        this.shutdownInProgress = false;
+
+        // Register default linters as preTest callbacks
+        this.addPreTest(runJsdoc);
+        this.addPreTest(runEslint);
+        this.addPreTest(runJsdocObjectTypeCheck);
+        this.addPreTest(runDocumentationCheck);
+
+        // Setup signal handlers
+        this.setupSignalHandlers();
+    }
+
+    /**
+     * Sets up SIGTERM and SIGINT handlers for graceful shutdown
+     */
+    setupSignalHandlers() {
+        const handleSignal = (signal) => {
+            if (this.shutdownInProgress) return;
+            this.shutdownInProgress = true;
+            console.log(`\n⚠️  Received ${signal}, shutting down gracefully...`);
+            this.emitAsync('shutdown', signal).finally(() => {
+                process.exit(1);
+            });
+        };
+
+        process.on('SIGTERM', () => handleSignal('SIGTERM'));
+        process.on('SIGINT', () => handleSignal('SIGINT'));
     }
 
     /**
@@ -47,7 +66,7 @@ export class Orchestrator extends EventEmitter {
         const resolvedFiles = files.map(f => {
              return fs.existsSync(f) ? f : (fs.existsSync(`tests/${f}`) ? `tests/${f}` : f);
         });
-        
+
         const missing = resolvedFiles.filter(f => !fs.existsSync(f));
         if (missing.length > 0) {
             console.error('❌ Test file(s) not found:');
@@ -79,19 +98,31 @@ export class Orchestrator extends EventEmitter {
         return files;
     }
 
-    addLinter(linterFn) {
-        this.linters.push(linterFn);
+    /**
+     * Adds a preTest callback (linters, server startup, etc.)
+     * @param {Function} callback - Async function returning { success: boolean, label: string, output?: string }
+     */
+    addPreTest(callback) {
+        this.preTestCallbacks.push(callback);
     }
 
-    async runLintChecks() {
-        if (this.linters.length === 0) return { passed: true, results: [] };
+    /**
+     * Runs all preTest callbacks in parallel
+     * @returns {Promise<{passed: boolean, results: Array}>}
+     */
+    async runPreTest() {
+        if (this.preTestCallbacks.length === 0) return { passed: true, results: [] };
 
-        const results = await Promise.all(this.linters.map(l => l()));
+        const results = await Promise.all(this.preTestCallbacks.map(cb => cb()));
         return { passed: results.every(r => r.success), results };
     }
 
-    logLintResults(results) {
-        console.log('🔍 Lint check results:');
+    /**
+     * Logs preTest results to console
+     * @param {Array} results - Array of preTest results
+     */
+    logPreTestResults(results) {
+        console.log('🔍 Pre-test check results:');
         for (const result of results) {
             if (result.success) {
                 console.log(`  ✓ ${result.label} passed`);
@@ -105,7 +136,7 @@ export class Orchestrator extends EventEmitter {
     async runTestSuite(testFiles) {
         const runners = availableParallelism();
         console.log(`\n🧪 Running tests with ${runners} parallel runners...\n`);
-        
+
         if (testFiles.length === 0) {
             console.log('  No test files found');
             return true;
@@ -116,9 +147,9 @@ export class Orchestrator extends EventEmitter {
                 files: testFiles,
                 concurrency: true
             }).compose(new spec());
-            
+
             testStream.pipe(process.stdout);
-            
+
             let passed = true;
             testStream.on('test:fail', () => {
                 passed = false;
@@ -132,46 +163,48 @@ export class Orchestrator extends EventEmitter {
     async run() {
         try {
             this.emit('init');
-            
+
             console.log('🎯 Test Orchestrator\n');
 
             if (this.lintOnly) {
-                console.log('🔍 Running lint checks only...');
-                const { passed, results } = await this.runLintChecks();
-                this.logLintResults(results);
+                console.log('🔍 Running pre-test checks only...');
+                const { passed, results } = await this.runPreTest();
+                this.logPreTestResults(results);
                 if (passed) {
-                    console.log('\n✅ All lint checks passed!');
+                    console.log('\n✅ All pre-test checks passed!');
                     process.exit(0);
                 } else {
-                    console.log('\n❌ Lint checks failed.');
+                    console.log('\n❌ Pre-test checks failed.');
                     process.exit(1);
                 }
             }
 
-            // Hook for cleanup before everything
-            await this.emitAsync('preTestCleanup', this.forceClean);
+            // CleanUp phase - first, awaits listeners (interactive cleanup)
+            console.log('🧹 Running cleanup phase...');
+            await this.emitAsync('cleanUp', this.forceClean);
 
-            // Parallel execution of Lints and Server/DB setup
-            // If specific files are requested, we might skip some setups, but that's up to the listeners
-            // to decide based on this.specificFiles
-            
-            console.log('🔍 Running lint checks and setup...');
-            
-            const lintPromise = this.runLintChecks();
-            const setupPromise = this.emitAsync('beforeTests', this.specificFiles);
-            
-            const [lintResult, _] = await Promise.all([lintPromise, setupPromise]);
-            
-            this.logLintResults(lintResult.results);
+            // Start finding test files async if no specific files given
+            const testFilesPromise = this.specificFiles
+                ? Promise.resolve(this.specificFiles)
+                : Promise.resolve().then(() => this.findTestFiles('tests'));
 
-            if (!lintResult.passed) {
-                console.log('\n❌ Lint checks failed. Aborting tests.');
-                await this.emitAsync('afterTests'); // Cleanup
+            // Run preTest callbacks in parallel with test file discovery
+            console.log('🔍 Running pre-test checks...');
+
+            const [preTestResult, testFiles] = await Promise.all([
+                this.runPreTest(),
+                testFilesPromise
+            ]);
+
+            this.logPreTestResults(preTestResult.results);
+
+            if (!preTestResult.passed) {
+                console.log('\n❌ Pre-test checks failed. Aborting tests.');
+                await this.emitAsync('afterTests');
                 process.exit(1);
             }
 
-            const files = this.specificFiles || this.findTestFiles('tests');
-            const testsPassed = await this.runTestSuite(files);
+            const testsPassed = await this.runTestSuite(testFiles);
 
             console.log('\n🧹 Post-test cleanup...');
             await this.emitAsync('afterTests');
@@ -195,5 +228,13 @@ export class Orchestrator extends EventEmitter {
     async emitAsync(event, ...args) {
         const listeners = this.listeners(event);
         await Promise.all(listeners.map(l => l(...args)));
+    }
+
+    /**
+     * Registers a shutdown handler that will be called on SIGTERM/SIGINT
+     * @param {Function} callback - Async function called with signal name
+     */
+    onShutdown(callback) {
+        this.on('shutdown', callback);
     }
 }
