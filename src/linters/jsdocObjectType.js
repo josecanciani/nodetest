@@ -8,7 +8,6 @@
 
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 
 /**
  * Recursively finds all .js files in a directory
@@ -48,10 +47,10 @@ function checkFileForObjectTypes(filePath) {
     const lines = content.split('\n');
     const violations = [];
 
-    // Pattern matches JSDoc tags that use {Object} as a type
-    // Matches: @param {Object}, @returns {Object}, @type {Object}, @typedef {Object}
-    // Also matches with modifiers: {Object|null}, {Object[]}, {?Object}
-    // Does NOT match: {Object<string, number>} (generic with type params - though still bad)
+    // Pattern matches JSDoc tags that use the generic Object word as a type
+    // Catches: param, returns, type, typedef tags with Object in their type expression
+    // Also matches with modifiers like Object|null, Object[], ?Object
+    // Does NOT match Object with type params (e.g. generic syntax - though still bad)
     const objectTypePattern = /(@(?:param|returns?|type|typedef|property|prop))\s+\{([^}]*\bObject\b[^}]*)\}/g;
 
     for (let i = 0; i < lines.length; i++) {

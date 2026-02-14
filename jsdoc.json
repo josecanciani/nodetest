@@ -1,0 +1,10 @@
+{
+  "plugins": ["node_modules/jsdoc-tsimport-plugin/index.js"],
+  "source": {
+    "include": ["src/", "tests/"],
+    "includePattern": ".+\\.js$"
+  },
+  "opts": {
+    "recurse": true
+  }
+}

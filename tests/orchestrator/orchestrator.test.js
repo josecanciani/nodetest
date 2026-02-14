@@ -1,0 +1,158 @@
+/**
+ * @fileoverview Tests for the Orchestrator class (public API only)
+ */
+
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { Orchestrator } from '../../src/orchestrator/orchestrator.js';
+
+describe('Orchestrator', () => {
+    describe('constructor', () => {
+        it('should create orchestrator with default settings', () => {
+            const orchestrator = new Orchestrator();
+            assert.equal(orchestrator.isLintOnly(), false);
+            assert.equal(orchestrator.requiresForceClean(), false);
+            assert.equal(orchestrator.isRunningSpecificFiles(), false);
+        });
+
+        it('should apply lintOnly setting', () => {
+            const orchestrator = new Orchestrator({ lintOnly: true, linters: [] });
+            assert.equal(orchestrator.isLintOnly(), true);
+        });
+
+        it('should apply forceClean setting', () => {
+            const orchestrator = new Orchestrator({ forceClean: true, linters: [] });
+            assert.equal(orchestrator.requiresForceClean(), true);
+        });
+
+        it('should apply files setting', () => {
+            const orchestrator = new Orchestrator({ files: ['a.js'], linters: [] });
+            assert.equal(orchestrator.isRunningSpecificFiles(), true);
+        });
+    });
+
+    describe('fromCLI', () => {
+        it('should parse --lint-only from CLI args', () => {
+            const orchestrator = Orchestrator.fromCLI(['node', 'test.js', '--lint-only']);
+            assert.equal(orchestrator.isLintOnly(), true);
+        });
+
+        it('should parse --files from CLI args', () => {
+            const orchestrator = Orchestrator.fromCLI(['node', 'test.js', '--files', 'a.test.js']);
+            assert.equal(orchestrator.isRunningSpecificFiles(), true);
+        });
+
+        it('should parse --force from CLI args', () => {
+            const orchestrator = Orchestrator.fromCLI(['node', 'test.js', '--force']);
+            assert.equal(orchestrator.requiresForceClean(), true);
+        });
+    });
+
+    describe('helper methods', () => {
+        it('requiresForceClean should return correct value', () => {
+            const orch1 = new Orchestrator({ forceClean: true, linters: [] });
+            const orch2 = new Orchestrator({ forceClean: false, linters: [] });
+            assert.equal(orch1.requiresForceClean(), true);
+            assert.equal(orch2.requiresForceClean(), false);
+        });
+
+        it('isRunningSpecificFiles should return true when files are specified', () => {
+            const orch1 = new Orchestrator({ files: ['a.js'], linters: [] });
+            const orch2 = new Orchestrator({ files: null, linters: [] });
+            const orch3 = new Orchestrator({ files: [], linters: [] });
+            assert.equal(orch1.isRunningSpecificFiles(), true);
+            assert.equal(orch2.isRunningSpecificFiles(), false);
+            assert.equal(orch3.isRunningSpecificFiles(), false);
+        });
+
+        it('isLintOnly should return correct value', () => {
+            const orch1 = new Orchestrator({ lintOnly: true, linters: [] });
+            const orch2 = new Orchestrator({ lintOnly: false, linters: [] });
+            assert.equal(orch1.isLintOnly(), true);
+            assert.equal(orch2.isLintOnly(), false);
+        });
+    });
+
+    describe('onShutdown', () => {
+        it('should register a shutdown listener', () => {
+            const orchestrator = new Orchestrator({ linters: [] });
+            const cb = async () => {};
+            orchestrator.onShutdown(cb);
+            assert.equal(orchestrator.listenerCount('shutdown'), 1);
+        });
+    });
+
+    describe('run', () => {
+        it('should return exitCode 0 when lintOnly and all preTests pass', async () => {
+            const orchestrator = new Orchestrator({ lintOnly: true, linters: [] });
+            orchestrator.addPreTest(async () => ({ success: true, label: 'lint' }));
+
+            const result = await orchestrator.run();
+            assert.equal(result.exitCode, 0);
+        });
+
+        it('should return exitCode 1 when lintOnly and a preTest fails', async () => {
+            const orchestrator = new Orchestrator({ lintOnly: true, linters: [] });
+            orchestrator.addPreTest(async () => ({ success: false, label: 'lint', output: 'fail' }));
+
+            const result = await orchestrator.run();
+            assert.equal(result.exitCode, 1);
+        });
+
+        it('should emit init event on run', async () => {
+            const orchestrator = new Orchestrator({ lintOnly: true, linters: [] });
+
+            let initEmitted = false;
+            orchestrator.on('init', () => { initEmitted = true; });
+
+            await orchestrator.run();
+            assert.ok(initEmitted);
+        });
+
+        it('should emit cleanUp event when not lintOnly', async () => {
+            const orchestrator = new Orchestrator({ lintOnly: false, files: [], linters: [] });
+
+            let cleanUpEmitted = false;
+            orchestrator.on('cleanUp', () => { cleanUpEmitted = true; });
+
+            await orchestrator.run();
+            assert.ok(cleanUpEmitted);
+        });
+
+        it('should pass orchestrator to event listeners', async () => {
+            const orchestrator = new Orchestrator({ lintOnly: true, linters: [] });
+
+            let receivedOrch = null;
+            orchestrator.on('init', (orch) => { receivedOrch = orch; });
+
+            await orchestrator.run();
+            assert.strictEqual(receivedOrch, orchestrator);
+        });
+
+        it('should emit afterTests event when preTests fail', async () => {
+            const orchestrator = new Orchestrator({ lintOnly: false, files: [], linters: [] });
+            orchestrator.addPreTest(async () => ({ success: false, label: 'fail', output: 'err' }));
+
+            let afterEmitted = false;
+            orchestrator.on('afterTests', () => { afterEmitted = true; });
+
+            const result = await orchestrator.run();
+            assert.equal(result.exitCode, 1);
+            assert.ok(afterEmitted);
+        });
+
+        it('should pass orchestrator to preTest callbacks', async () => {
+            const orchestrator = new Orchestrator({ lintOnly: true, linters: [] });
+
+            let receivedOrch = null;
+            orchestrator.addPreTest(async (orch) => {
+                receivedOrch = orch;
+                return { success: true, label: 'test' };
+            });
+
+            await orchestrator.run();
+            assert.strictEqual(receivedOrch, orchestrator);
+        });
+    });
+});
