@@ -1,0 +1,22 @@
+{
+    "breadcrumbs.enabled": true,
+    "editor.tabSize": 4,
+    "files.exclude": {
+        "**/.DS_Store": true,
+        "**/.git": true
+    },
+    "files.insertFinalNewline": true,
+    "files.trimFinalNewlines": true,
+    "files.trimTrailingWhitespace": true,
+    "files.watcherExclude": {
+        "**/.git/objects/**": true,
+        "**/.git/subtree-cache/**": true,
+        "**/node_modules/**": true
+    },
+    "git.confirmSync": false,
+    "gitlens.codeLens.enabled": false,
+    "gitlens.codeLens.includeSingleLineSymbols": true,
+    "gitlens.currentLine.enabled": false,
+    "gitlens.currentLine.scrollable": false,
+    "javascript.updateImportsOnFileMove.enabled": "always"
+}
