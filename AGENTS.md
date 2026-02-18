@@ -1,9 +1,17 @@
 # nodetest - Agent Guidelines
 
+<!-- CRITICAL_RULES
+- RUN_TESTS_AFTER_CHANGES: Always run `npm test` after making any code changes, before reporting completion
+- NO_TYPESCRIPT: Use vanilla JavaScript only, no TypeScript syntax anywhere including JSDoc
+- JS_EXTENSION: Always include .js extension in ES Module imports
+- JSDOC_PARSEABLE: JSDoc must be parseable by standard tools (no TypeScript-style ? in inline types)
+-->
+
 ## Quick Reference
 
 **Critical Rules:**
 
+- **Always run `npm test` after any code change**, before reporting completion
 - Use vanilla JavaScript only—**no TypeScript syntax anywhere**
 - Always include `.js` extension in ES Module imports
 - JSDoc must be parseable by standard tools (no TypeScript-style `?` in inline types)
@@ -122,7 +130,7 @@ export default router;                    // Default export
 ## Agent Instructions
 
 ### Do
-- Run tests when changing code
+- **Always run `npm test` after any code change**, before reporting completion
 - Handle errors gracefully with meaningful messages
 - Keep the CLI thin—delegate to client functions
 
