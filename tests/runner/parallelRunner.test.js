@@ -111,5 +111,21 @@ describe('ParallelRunner', () => {
             assert.deepStrictEqual(results, ['a', 'b', 'c']);
             assert.deepStrictEqual(order, ['a', 'b', 'c']);
         });
+
+        it('should execute tasks in parallel (time check)', async () => {
+            const runner = new ParallelRunner(3);
+            const delay = 50;
+            const taskCount = 3;
+
+            const start = performance.now();
+            await runner.run(Array(taskCount).fill(() => new Promise(r => setTimeout(r, delay))));
+            const end = performance.now();
+            const duration = end - start;
+
+            // Sequential time would be taskCount * delay (150ms)
+            // Parallel time should be close to delay (50ms) + overhead
+            // We'll assert it's less than (taskCount - 0.5) * delay to be safe
+            assert.ok(duration < (taskCount * delay * 0.8), `Tasks did not run in parallel. Took ${duration}ms, expected < ${taskCount * delay}ms`);
+        });
     });
 });
