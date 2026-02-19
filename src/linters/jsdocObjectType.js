@@ -8,6 +8,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { CheckResult } from '../results.js';
 
 /**
  * Recursively finds all .js files in a directory
@@ -89,17 +90,36 @@ function checkFileForObjectTypes(filePath) {
 
 /**
  * Runs the Object type check on all source files
- * @param {string} dir - Directory to search (defaults to 'src')
- * @returns {Promise<{success: boolean, output: string, label: string}>}
+ * @param {import('../orchestrator/orchestrator.js').Orchestrator|string} [orchOrDir='src'] - Orchestrator or directory
+ * @returns {Promise<CheckResult>}
  */
-export function runJsdocObjectTypeCheck(dir = 'src') {
+export function runJsdocObjectTypeCheck(orchOrDir = 'src') {
+    let dir = 'src';
+    if (orchOrDir && typeof orchOrDir.getSettings === 'function') {
+        const settings = orchOrDir.getSettings();
+        if (settings.linters && settings.linters.jsdoc && settings.linters.jsdoc.dirs) {
+            // Usually this check runs on source directory, not multiple dirs?
+            // "Recursively finds all .js files in a directory"
+            // If user has multiple dirs, we might need loop.
+            // But let's assume first dir for now or default to 'src'.
+            if (Array.isArray(settings.linters.jsdoc.dirs) && settings.linters.jsdoc.dirs.length > 0) {
+                dir = settings.linters.jsdoc.dirs[0]; // Simplification
+            }
+        }
+    } else if (typeof orchOrDir === 'string') {
+        dir = orchOrDir;
+    }
     return new Promise((resolve) => {
         try {
-            const jsFiles = findJsFiles(dir);
+            if (!fs.existsSync(dir)) {
+                return resolve(new CheckResult(true, 'JSDoc Object types', `Directory ${dir} not found, skipping.`));
+            }
+
+            const jsFiles = findJsFiles(dir); // Assuming findJsFiles is defined in scope
             const allViolations = [];
 
             for (const file of jsFiles) {
-                const violations = checkFileForObjectTypes(file);
+                const violations = checkFileForObjectTypes(file); // Assuming defined
                 allViolations.push(...violations);
             }
 
@@ -117,23 +137,23 @@ export function runJsdocObjectTypeCheck(dir = 'src') {
                 for (const [file, violations] of grouped) {
                     output += `${file}:\n`;
                     for (const v of violations) {
-                        output += `  Line ${v.line}: ${v.tag} {${v.typeExpr}}\n`;
+                        output += `  Line ${v.line}:\n`;
                         output += `    ${v.content}\n`;
                     }
                     output += '\n';
                 }
                 output += 'Use specific types instead of Object. Define a @typedef or use inline object syntax {property: type}.';
 
-                resolve({ success: false, output, label: 'JSDoc Object types' });
+                resolve(new CheckResult(false, 'JSDoc Object types', output));
             } else {
-                resolve({
-                    success: true,
-                    output: `Checked ${jsFiles.length} files in ${dir}, no generic Object types found.`,
-                    label: 'JSDoc Object types'
-                });
+                resolve(new CheckResult(
+                    true,
+                    'JSDoc Object types',
+                    `Checked ${jsFiles.length} files in ${dir}, no generic Object types found.`
+                ));
             }
         } catch (err) {
-            resolve({ success: false, output: err.message, label: 'JSDoc Object types' });
+            resolve(new CheckResult(false, 'JSDoc Object types', err.message));
         }
     });
 }

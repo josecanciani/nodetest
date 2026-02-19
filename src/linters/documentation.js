@@ -4,41 +4,64 @@
 
 import fs from 'fs';
 import path from 'path';
+import { CheckResult } from '../results.js';
 
 /**
  * Runs documentation check
- * @param {string} [projectRoot='.'] - Path to project root
- * @param {string} [pattern='npm run %s'] - Pattern to check in README (use %s for script name)
- * @param {string} [file='README.md'] - Documentation file to check
- * @returns {Promise<{success: boolean, output: string, label: string}>}
+ * @param {import('../orchestrator/orchestrator.js').Orchestrator|string} [orchOrRoot='.'] - Orchestrator instance or project root path
+ * @param {string} [pattern] - Pattern (only if first arg is root path)
+ * @param {string} [file] - File (only if first arg is root path)
+ * @returns {Promise<CheckResult>}
  */
-export function runDocumentationCheck(projectRoot = '.', pattern = 'npm run %s', file = 'README.md') {
+export function runDocumentationCheck(orchOrRoot = '.', pattern = 'npm run %s', file = 'README.md') {
+    let projectRoot = '.';
+    let checkPattern = 'npm run %s';
+    let checkFile = 'README.md';
+
+    if (orchOrRoot && typeof orchOrRoot.getSettings === 'function') {
+        const settings = orchOrRoot.getSettings();
+        if (settings.linters && settings.linters.documentation) {
+            if (settings.linters.documentation.pattern) checkPattern = settings.linters.documentation.pattern;
+            if (settings.linters.documentation.file) checkFile = settings.linters.documentation.file;
+        }
+    } else if (typeof orchOrRoot === 'string') {
+        projectRoot = orchOrRoot;
+        if (pattern) checkPattern = pattern;
+        if (file) checkFile = file;
+    }
+
     return new Promise((resolve) => {
         try {
             const packageJsonPath = path.join(projectRoot, 'package.json');
-            const readmePath = path.join(projectRoot, file);
+            const readmePath = path.join(projectRoot, checkFile);
 
-            if (!fs.existsSync(packageJsonPath) || !fs.existsSync(readmePath)) {
-                return resolve({
-                    success: false,
-                    output: 'package.json or README.md not found',
-                    label: 'Documentation Check'
-                });
+            if (!fs.existsSync(packageJsonPath)) {
+                return resolve(new CheckResult(
+                    false,
+                    'Documentation Check',
+                    'package.json not found'
+                ));
+            }
+
+            if (!fs.existsSync(readmePath)) {
+                return resolve(new CheckResult(
+                    false,
+                    'Documentation Check',
+                    `${checkFile} not found`
+                ));
             }
 
             // Read package.json
             const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-            const scripts = Object.keys(packageJson.scripts || {});
+            const scripts = Object.keys(packageJson.scripts || {}); // Use Object.keys to handle no scripts
 
             // Read README.md
             const readmeContent = fs.readFileSync(readmePath, 'utf8');
 
-            // Check each script
             const missingScripts = [];
-            scripts.forEach(scriptName => {
+            for (const scriptName of scripts) {
                 // Determine expected string based on pattern
-                // Defaut pattern is 'npm run %s'
-                let template = pattern || 'npm run %s';
+                let template = checkPattern;
 
                 // Backwards compatibility: if pattern doesn't contain %s, treat it as a prefix
                 if (!template.includes('%s')) {
@@ -50,23 +73,23 @@ export function runDocumentationCheck(projectRoot = '.', pattern = 'npm run %s',
                 if (!readmeContent.includes(expectedString)) {
                     missingScripts.push(scriptName);
                 }
-            });
+            }
 
             if (missingScripts.length > 0) {
-                resolve({
-                    success: false,
-                    output: `The following scripts are not documented in README.md:\n${missingScripts.join('\n')}`,
-                    label: 'Documentation Check'
-                });
+                resolve(new CheckResult(
+                    false,
+                    'Documentation Check',
+                    `The following scripts are not documented in ${checkFile}:\n${missingScripts.join('\n')}`
+                ));
             } else {
-                resolve({
-                    success: true,
-                    output: 'All scripts documented.',
-                    label: 'Documentation Check'
-                });
+                resolve(new CheckResult(
+                    true,
+                    'Documentation Check',
+                    'All scripts documented.'
+                ));
             }
         } catch (err) {
-            resolve({ success: false, output: err.message, label: 'Documentation Check' });
+            resolve(new CheckResult(false, 'Documentation Check', err.message));
         }
     });
 }

@@ -8,6 +8,18 @@ import { EventEmitter } from 'events';
 
 import { mergeSettings, parseCliArgs } from '../settings/settings.js';
 import { OrchestratorRunner } from './runner.js';
+import { runJsdoc } from '../linters/jsdoc.js';
+import { runEslint } from '../linters/eslint.js';
+import { runJsdocObjectTypeCheck } from '../linters/jsdocObjectType.js';
+import { runDocumentationCheck } from '../linters/documentation.js';
+
+/** @type {Map<string, Function>} */
+const BUILTIN_CHECKS = new Map([
+    ['jsdoc', runJsdoc],
+    ['eslint', runEslint],
+    ['jsdocObjectType', runJsdocObjectTypeCheck],
+    ['documentation', runDocumentationCheck]
+]);
 
 /**
  * @typedef {Object} OrchestratorRunResult
@@ -25,7 +37,9 @@ export class Orchestrator extends EventEmitter {
      */
     constructor(settings) {
         super();
-        const resolved = mergeSettings(settings);
+        const resolved = mergeSettings(settings); // This merges with defaults
+        /** @private */
+        this._settings = resolved;
 
         /** @private */
         this._lintOnly = resolved.lintOnly;
@@ -34,17 +48,25 @@ export class Orchestrator extends EventEmitter {
         /** @private */
         this._specificFiles = resolved.files;
         /** @private */
-        this._documentationSettings = resolved.documentation;
-        /** @private */
         this._parallelism = resolved.parallelism;
         /** @private */
         this._preTestCallbacks = [];
         /** @private */
         this._runner = new OrchestratorRunner(this);
 
-        // Register built-in linters from settings as preTest callbacks
-        for (const linter of resolved.linters) {
-            this.addPreTest(linter);
+        // Register built-in checks from settings as preTest callbacks
+        const checks = resolved.checks || [];
+        for (const check of checks) {
+            if (typeof check === 'string') {
+                const checkFn = BUILTIN_CHECKS.get(check);
+                if (checkFn) {
+                    this.addPreCheck(checkFn);
+                } else {
+                    console.warn(`Warning: Unknown check '${check}' specified in settings.`);
+                }
+            } else if (typeof check === 'function') {
+                this.addPreCheck(check);
+            }
         }
 
         // Setup signal handlers
@@ -54,20 +76,56 @@ export class Orchestrator extends EventEmitter {
     /**
      * Creates an Orchestrator configured from CLI arguments (process.argv)
      * @param {string[]} [argv] - Arguments array, defaults to process.argv
+     * @param {import('../settings/settings.js').OrchestratorSettings} [overrides] - Optional settings overrides
      * @returns {Orchestrator}
      */
-    static fromCLI(argv) {
-        return new Orchestrator(parseCliArgs(argv));
+    static fromCLI(argv, overrides = {}) {
+        const cliSettings = parseCliArgs(argv);
+
+        // Start with CLI settings (which include defaults)
+        const merged = { ...cliSettings };
+
+        // Apply overrides only if CLI didn't explicitly set them (assuming defaults are "falsy" or specific values)
+        // Since parseCliArgs returns defaults when flags are missing, we can't distinguish explicit vs default easily without re-parsing or logic.
+        // But for boolean flags: false is default. If CLI is false, we can take override.
+        // If CLI is true, we keep it (CLI wins).
+        if (!merged.lintOnly && overrides.lintOnly) merged.lintOnly = true;
+        if (!merged.forceClean && overrides.forceClean) merged.forceClean = true;
+
+        // For files: CLI default is null.
+        if (merged.files === null && overrides.files) merged.files = overrides.files;
+
+        // For checks: CLI `checks` is DEFAULT_CHECKS.
+        // If overrides provides checks, we should prefer overrides UNLESS there's a way to specify checks via CLI (there isn't currently).
+        // So overrides should win for checks.
+        if (overrides.checks) merged.checks = overrides.checks;
+
+        // For linters: Merge deep
+        if (overrides.linters) {
+            merged.linters = { ...merged.linters, ...overrides.linters };
+        }
+
+        // For parallelism: CLI default is availableParallelism().
+        // If override specifies it, use it? CLI arg doesn't support parallelism yet in parseCliArgs.
+        if (overrides.parallelism) merged.parallelism = overrides.parallelism;
+
+        return new Orchestrator(merged);
     }
 
     /**
-     * Adds a preTest callback (linters, server startup, etc.)
-     * The callback receives the Orchestrator instance as its first argument,
-     * allowing it to inspect settings like specificFiles or lintOnly.
-     * @param {Function} callback - Async function(orchestrator) returning { success: boolean, label: string, output?: string }
+     * Adds a preTest check.
+     * @param {Function} callback - Async function(orchestrator) returning CheckResult
+     */
+    addPreCheck(callback) {
+        this._preTestCallbacks.push(callback);
+    }
+
+    /**
+     * @deprecated Use addPreCheck instead
+     * @param {Function} callback
      */
     addPreTest(callback) {
-        this._preTestCallbacks.push(callback);
+        this.addPreCheck(callback);
     }
 
     /**
@@ -130,10 +188,10 @@ export class Orchestrator extends EventEmitter {
     }
 
     /**
-     * Returns documentation check settings.
-     * @returns {{pattern: string, file: string}}
+     * Returns the complete settings object.
+     * @returns {import('../settings/settings.js').OrchestratorSettings}
      */
-    getDocumentationSettings() {
-        return this._documentationSettings;
+    getSettings() {
+        return this._settings;
     }
 }
