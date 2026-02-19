@@ -58,7 +58,7 @@ const orchestrator = Orchestrator.fromCLI();
 let serverProcess = null;
 
 /** @param {import('nodetest').Orchestrator} orch */
-orchestrator.addPreTest(async (orch) => {
+orchestrator.addPreCheck(async (orch) => {
     serverProcess = spawn('node', ['src/index.js'], { stdio: 'pipe' });
     const ready = await pollUntilReady('http://localhost:3000/status');
     return {
@@ -91,7 +91,7 @@ Every callback receives the Orchestrator instance. Use `isRunningSpecificFiles()
 
 ```javascript
 /** @param {import('nodetest').Orchestrator} orch */
-orchestrator.addPreTest(async (orch) => {
+orchestrator.addPreCheck(async (orch) => {
     if (orch.isRunningSpecificFiles()) {
         // Running specific files — skip the full preseed
         return { success: true, label: 'Database preseeding (skipped, will seed on demand)' };

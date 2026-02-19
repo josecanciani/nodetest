@@ -3,13 +3,31 @@
  */
 
 import { spawn } from 'node:child_process';
+import { CheckResult } from '../results.js';
 
 /**
  * Runs ESLint check
- * @param {string[]} [dirs=['src/', 'tests/']] - Directories to lint
- * @returns {Promise<{success: boolean, output: string, label: string}>}
+ * @param {import('../orchestrator/orchestrator.js').Orchestrator|string[]} [orchOrDirs=['src/', 'tests/']] - Orchestrator or directories
+ * @returns {Promise<CheckResult>}
  */
-export function runEslint(dirs = ['src/', 'tests/']) {
+export function runEslint(orchOrDirs = ['src/', 'tests/']) {
+    let dirs = ['src/', 'tests/'];
+
+    // Check if first argument is Orchestrator
+    // We check for getSettings method to identify Orchestrator
+    if (orchOrDirs && typeof orchOrDirs.getSettings === 'function') {
+        // Could extract settings here if needed, but eslint usually just runs on standard dirs
+        // If we added config for dirs in settings, we would use it here.
+        // For now, stick to default dirs or potentially look for settings.
+        // settings.linters.eslint.dirs?
+        const settings = orchOrDirs.getSettings();
+        if (settings.linters && settings.linters.eslint && settings.linters.eslint.dirs) {
+            dirs = settings.linters.eslint.dirs;
+        }
+    } else if (Array.isArray(orchOrDirs)) {
+        dirs = orchOrDirs;
+    }
+
     return new Promise((resolve) => {
         const proc = spawn('npx', ['eslint', ...dirs], {
             stdio: ['ignore', 'pipe', 'pipe'],
@@ -23,10 +41,10 @@ export function runEslint(dirs = ['src/', 'tests/']) {
             output += data.toString();
         });
         proc.on('close', (code) => {
-            resolve({ success: code === 0, output, label: 'ESLint' });
+            resolve(new CheckResult(code === 0, 'ESLint', output));
         });
         proc.on('error', (err) => {
-            resolve({ success: false, output: err.message, label: 'ESLint' });
+            resolve(new CheckResult(false, 'ESLint', err.message));
         });
     });
 }

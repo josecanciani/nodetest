@@ -61,7 +61,7 @@ describe('mergeSettings', () => {
     });
 
     it('should override checks with custom array', () => {
-        const customCheck = async () => ({ success: true, label: 'custom' });
+        const customCheck = 'custom-check';
         const settings = mergeSettings({ checks: [customCheck] });
         assert.equal(settings.checks.length, 1);
         assert.equal(settings.checks[0], customCheck);

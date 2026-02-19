@@ -47,6 +47,16 @@ describe('Orchestrator', () => {
             const orchestrator = Orchestrator.fromCLI(['node', 'test.js', '--force']);
             assert.equal(orchestrator.requiresForceClean(), true);
         });
+
+        it('should accept overrides', () => {
+            const orchestrator = Orchestrator.fromCLI(['node', 'test.js'], { lintOnly: true });
+            assert.equal(orchestrator.isLintOnly(), true);
+        });
+
+        it('should prioritize CLI args over overrides', () => {
+            const orchestrator = Orchestrator.fromCLI(['node', 'test.js', '--lint-only'], { lintOnly: false });
+            assert.equal(orchestrator.isLintOnly(), true);
+        });
     });
 
     describe('helper methods', () => {
@@ -86,7 +96,7 @@ describe('Orchestrator', () => {
     describe('run', () => {
         it('should return exitCode 0 when lintOnly and all preTests pass', async () => {
             const orchestrator = new Orchestrator({ lintOnly: true, checks: [] });
-            orchestrator.addPreTest(async () => ({ success: true, label: 'lint' }));
+            orchestrator.addPreCheck(async () => ({ success: true, label: 'lint' }));
 
             const result = await orchestrator.run();
             assert.equal(result.exitCode, 0);
@@ -94,10 +104,18 @@ describe('Orchestrator', () => {
 
         it('should return exitCode 1 when lintOnly and a preTest fails', async () => {
             const orchestrator = new Orchestrator({ lintOnly: true, checks: [] });
-            orchestrator.addPreTest(async () => ({ success: false, label: 'lint', output: 'fail' }));
+            orchestrator.addPreCheck(async () => ({ success: false, label: 'lint', output: 'fail' }));
 
             const result = await orchestrator.run();
             assert.equal(result.exitCode, 1);
+        });
+
+        it('should support deprecated addPreTest', async () => {
+            const orchestrator = new Orchestrator({ lintOnly: true, checks: [] });
+            orchestrator.addPreTest(async () => ({ success: true, label: 'lint' }));
+
+            const result = await orchestrator.run();
+            assert.equal(result.exitCode, 0);
         });
 
         it('should emit init event on run', async () => {
@@ -132,7 +150,7 @@ describe('Orchestrator', () => {
 
         it('should emit afterTests event when preTests fail', async () => {
             const orchestrator = new Orchestrator({ lintOnly: false, files: [], checks: [] });
-            orchestrator.addPreTest(async () => ({ success: false, label: 'fail', output: 'err' }));
+            orchestrator.addPreCheck(async () => ({ success: false, label: 'fail', output: 'err' }));
 
             let afterEmitted = false;
             orchestrator.on('afterTests', () => { afterEmitted = true; });
@@ -142,11 +160,11 @@ describe('Orchestrator', () => {
             assert.ok(afterEmitted);
         });
 
-        it('should pass orchestrator to preTest callbacks', async () => {
+        it('should pass orchestrator to preCheck callbacks', async () => {
             const orchestrator = new Orchestrator({ lintOnly: true, checks: [] });
 
             let receivedOrch = null;
-            orchestrator.addPreTest(async (orch) => {
+            orchestrator.addPreCheck(async (orch) => {
                 receivedOrch = orch;
                 return { success: true, label: 'test' };
             });

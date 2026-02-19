@@ -4,10 +4,13 @@
  */
 
 import { availableParallelism } from 'node:os';
-import { runEslint } from '../linters/eslint.js';
-import { runJsdoc } from '../linters/jsdoc.js';
-import { runJsdocObjectTypeCheck } from '../linters/jsdocObjectType.js';
-import { runDocumentationCheck } from '../linters/documentation.js';
+
+/**
+ * @typedef {Object} CheckResult
+ * @property {boolean} success - Whether the check passed
+ * @property {string} label - Display label for the check
+ * @property {string} [output] - Optional error output or details
+ */
 
 /**
  * @typedef {Object} OrchestratorSettings
@@ -15,17 +18,27 @@ import { runDocumentationCheck } from '../linters/documentation.js';
  * @property {boolean} [forceClean] - Force cleanup phase
  * @property {string[]} [files] - Specific test files (null means auto-discover)
  * @property {number} [parallelism] - Max concurrent preTest tasks
- * @property {{pattern: string, file: string}} [documentation] - Documentation check settings
- * @property {string} [documentation.pattern] - Pattern for script command (e.g. 'npm run %s')
- * @property {string} [documentation.file] - Documentation file path (default: README.md)
+ * @property {string[]} [checks] - Names of built-in checks to run (e.g. ['jsdoc', 'eslint'])
+ * @property {LintersConfig} [linters] - Configuration for linters/checks
  */
 
-/** @type {Function[]} */
-const DEFAULT_CHECKS = [
-    () => runJsdoc(),
-    () => runEslint(),
-    () => runJsdocObjectTypeCheck(),
-    (orch) => runDocumentationCheck(orch)
+/**
+ * @typedef {Object} DocumentationConfig
+ * @property {string} [pattern] - Pattern for script command (e.g. 'npm run %s')
+ * @property {string} [file] - Documentation file path (default: README.md)
+ */
+
+/**
+ * @typedef {Object} LintersConfig
+ * @property {DocumentationConfig} [documentation] - Documentation check settings
+ */
+
+/** @type {string[]} */
+const DEFAULT_CHECK_NAMES = [
+    'jsdoc',
+    'eslint',
+    'jsdocObjectType',
+    'documentation'
 ];
 
 /**
@@ -38,7 +51,7 @@ export function getDefaultSettings() {
         forceClean: false,
         files: null,
         parallelism: availableParallelism(),
-        checks: [...DEFAULT_CHECKS],
+        checks: [...DEFAULT_CHECK_NAMES],
         linters: {
             documentation: {
                 pattern: 'npm run %s',
@@ -91,7 +104,7 @@ export function parseCliArgs(argv) {
         forceClean,
         files,
         parallelism: availableParallelism(),
-        checks: [...DEFAULT_CHECKS],
+        checks: [...DEFAULT_CHECK_NAMES],
         linters: getDefaultSettings().linters
     };
 }

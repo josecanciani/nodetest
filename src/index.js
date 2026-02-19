@@ -9,3 +9,4 @@ export { runEslint } from './linters/eslint.js';
 export { runJsdoc } from './linters/jsdoc.js';
 export { runJsdocObjectTypeCheck } from './linters/jsdocObjectType.js';
 export { runDocumentationCheck } from './linters/documentation.js';
+export { CheckResult } from './results.js';
