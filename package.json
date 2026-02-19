@@ -1,26 +1,26 @@
 {
-  "name": "nodetest",
-  "version": "1.1.0",
-  "description": "Basic tools to test a node project",
-  "type": "module",
-  "main": "src/index.js",
-  "scripts": {
-    "test": "node --test 'tests/**/*.test.js'"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/josecanciani/nodetest.git"
-  },
-  "author": "Jose Canciani",
-  "license": "ISC",
-  "peerDependencies": {
-    "eslint": "*",
-    "jsdoc": "*"
-  },
-  "devDependencies": {
-    "eslint": "^9.39.2",
-    "globals": "^17.3.0",
-    "jsdoc": "^4.0.5",
-    "jsdoc-tsimport-plugin": "^1.0.5"
-  }
+    "name": "nodetest",
+    "version": "1.2.0",
+    "description": "Basic tools to test a node project",
+    "type": "module",
+    "main": "src/index.js",
+    "scripts": {
+        "test": "node --test 'tests/**/*.test.js'"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/josecanciani/nodetest.git"
+    },
+    "author": "Jose Canciani",
+    "license": "ISC",
+    "peerDependencies": {
+        "eslint": "*",
+        "jsdoc": "*"
+    },
+    "devDependencies": {
+        "eslint": "^9.39.2",
+        "globals": "^17.3.0",
+        "jsdoc": "^4.0.5",
+        "jsdoc-tsimport-plugin": "^1.0.5"
+    }
 }
