@@ -121,14 +121,6 @@ export class Orchestrator extends EventEmitter {
     }
 
     /**
-     * @deprecated Use addPreCheck instead
-     * @param {Function} callback
-     */
-    addPreTest(callback) {
-        this.addPreCheck(callback);
-    }
-
-    /**
      * Runs the full orchestrator lifecycle
      * @returns {Promise<OrchestratorRunResult>} Result with exitCode (0 = success, 1 = failure)
      */

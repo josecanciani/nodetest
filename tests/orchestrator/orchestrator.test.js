@@ -102,7 +102,7 @@ describe('Orchestrator', () => {
     describe('run', () => {
         it('should return exitCode 0 when lintOnly and all preTests pass', async () => {
             const orchestrator = new Orchestrator({ lintOnly: true, checks: [] });
-            orchestrator.addPreTest(async () => ({ success: true, label: 'lint' }));
+            orchestrator.addPreCheck(async () => ({ success: true, label: 'lint' }));
 
             const result = await orchestrator.run();
             assert.equal(result.exitCode, 0);
@@ -110,7 +110,7 @@ describe('Orchestrator', () => {
 
         it('should return exitCode 1 when lintOnly and a preTest fails', async () => {
             const orchestrator = new Orchestrator({ lintOnly: true, checks: [] });
-            orchestrator.addPreTest(async () => ({ success: false, label: 'lint', output: 'fail' }));
+            orchestrator.addPreCheck(async () => ({ success: false, label: 'lint', output: 'fail' }));
 
             const result = await orchestrator.run();
             assert.equal(result.exitCode, 1);
@@ -148,7 +148,7 @@ describe('Orchestrator', () => {
 
         it('should emit afterTests event when preTests fail', async () => {
             const orchestrator = new Orchestrator({ lintOnly: false, files: [], checks: [] });
-            orchestrator.addPreTest(async () => ({ success: false, label: 'fail', output: 'err' }));
+            orchestrator.addPreCheck(async () => ({ success: false, label: 'fail', output: 'err' }));
 
             let afterEmitted = false;
             orchestrator.on('afterTests', () => { afterEmitted = true; });
@@ -162,7 +162,7 @@ describe('Orchestrator', () => {
             const orchestrator = new Orchestrator({ lintOnly: true, checks: [] });
 
             let receivedOrch = null;
-            orchestrator.addPreTest(async (orch) => {
+            orchestrator.addPreCheck(async (orch) => {
                 receivedOrch = orch;
                 return { success: true, label: 'test' };
             });
