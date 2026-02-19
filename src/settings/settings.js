@@ -21,14 +21,11 @@ import { runDocumentationCheck } from '../linters/documentation.js';
  */
 
 /** @type {Function[]} */
-const DEFAULT_LINTERS = [
+const DEFAULT_CHECKS = [
     () => runJsdoc(),
     () => runEslint(),
     () => runJsdocObjectTypeCheck(),
-    (orch) => {
-        const settings = orch.getDocumentationSettings();
-        return runDocumentationCheck('.', settings.pattern, settings.file);
-    }
+    (orch) => runDocumentationCheck(orch)
 ];
 
 /**
@@ -41,10 +38,12 @@ export function getDefaultSettings() {
         forceClean: false,
         files: null,
         parallelism: availableParallelism(),
-        linters: [...DEFAULT_LINTERS],
-        documentation: {
-            pattern: 'npm run %s',
-            file: 'README.md'
+        checks: [...DEFAULT_CHECKS],
+        linters: {
+            documentation: {
+                pattern: 'npm run %s',
+                file: 'README.md'
+            }
         }
     };
 }
@@ -63,9 +62,8 @@ export function mergeSettings(userSettings) {
         forceClean: userSettings.forceClean ?? defaults.forceClean,
         files: userSettings.files !== undefined ? userSettings.files : defaults.files,
         parallelism: userSettings.parallelism ?? defaults.parallelism,
-        parallelism: userSettings.parallelism ?? defaults.parallelism,
-        linters: userSettings.linters !== undefined ? userSettings.linters : defaults.linters,
-        documentation: { ...defaults.documentation, ...userSettings.documentation }
+        checks: userSettings.checks !== undefined ? userSettings.checks : defaults.checks,
+        linters: { ...defaults.linters, ...(userSettings.linters || {}) }
     };
 }
 
@@ -93,6 +91,7 @@ export function parseCliArgs(argv) {
         forceClean,
         files,
         parallelism: availableParallelism(),
-        linters: [...DEFAULT_LINTERS]
+        checks: [...DEFAULT_CHECKS],
+        linters: getDefaultSettings().linters
     };
 }

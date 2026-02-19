@@ -15,13 +15,13 @@ describe('getDefaultSettings', () => {
         assert.equal(settings.files, null);
         assert.equal(typeof settings.parallelism, 'number');
         assert.ok(settings.parallelism > 0);
-        assert.equal(settings.linters.length, 4);
+        assert.equal(settings.checks.length, 4);
     });
 
-    it('should return a new linters array each time', () => {
+    it('should return a new checks array each time', () => {
         const a = getDefaultSettings();
         const b = getDefaultSettings();
-        assert.notStrictEqual(a.linters, b.linters);
+        assert.notStrictEqual(a.checks, b.checks);
     });
 });
 
@@ -31,7 +31,7 @@ describe('mergeSettings', () => {
         assert.equal(settings.lintOnly, false);
         assert.equal(settings.forceClean, false);
         assert.equal(settings.files, null);
-        assert.equal(settings.linters.length, 4);
+        assert.equal(settings.checks.length, 4);
     });
 
     it('should override lintOnly', () => {
@@ -55,22 +55,22 @@ describe('mergeSettings', () => {
         assert.equal(settings.parallelism, 2);
     });
 
-    it('should override linters with empty array', () => {
-        const settings = mergeSettings({ linters: [] });
-        assert.deepStrictEqual(settings.linters, []);
+    it('should override checks with empty array', () => {
+        const settings = mergeSettings({ checks: [] });
+        assert.deepStrictEqual(settings.checks, []);
     });
 
-    it('should override linters with custom array', () => {
-        const customLinter = async () => ({ success: true, label: 'custom' });
-        const settings = mergeSettings({ linters: [customLinter] });
-        assert.equal(settings.linters.length, 1);
-        assert.equal(settings.linters[0], customLinter);
+    it('should override checks with custom array', () => {
+        const customCheck = async () => ({ success: true, label: 'custom' });
+        const settings = mergeSettings({ checks: [customCheck] });
+        assert.equal(settings.checks.length, 1);
+        assert.equal(settings.checks[0], customCheck);
     });
 
     it('should keep defaults for properties not provided', () => {
         const settings = mergeSettings({ lintOnly: true });
         assert.equal(settings.files, null);
-        assert.equal(settings.linters.length, 4);
+        assert.equal(settings.checks.length, 4);
         assert.ok(settings.parallelism > 0);
     });
 });
@@ -112,6 +112,6 @@ describe('parseCliArgs', () => {
         assert.equal(settings.lintOnly, false);
         assert.equal(settings.forceClean, false);
         assert.equal(settings.files, null);
-        assert.equal(settings.linters.length, 4);
+        assert.equal(settings.checks.length, 4);
     });
 });
