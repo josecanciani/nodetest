@@ -25,7 +25,9 @@ export class Orchestrator extends EventEmitter {
      */
     constructor(settings) {
         super();
-        const resolved = mergeSettings(settings);
+        const resolved = mergeSettings(settings); // This merges with defaults
+        /** @private */
+        this._settings = resolved;
 
         /** @private */
         this._lintOnly = resolved.lintOnly;
@@ -34,17 +36,16 @@ export class Orchestrator extends EventEmitter {
         /** @private */
         this._specificFiles = resolved.files;
         /** @private */
-        this._documentationSettings = resolved.documentation;
-        /** @private */
         this._parallelism = resolved.parallelism;
         /** @private */
         this._preTestCallbacks = [];
         /** @private */
         this._runner = new OrchestratorRunner(this);
 
-        // Register built-in linters from settings as preTest callbacks
-        for (const linter of resolved.linters) {
-            this.addPreTest(linter);
+        // Register built-in checks from settings as preTest callbacks
+        const checks = resolved.checks || [];
+        for (const check of checks) {
+            this.addPreTest(check);
         }
 
         // Setup signal handlers
@@ -130,10 +131,10 @@ export class Orchestrator extends EventEmitter {
     }
 
     /**
-     * Returns documentation check settings.
-     * @returns {{pattern: string, file: string}}
+     * Returns the complete settings object.
+     * @returns {import('../settings/settings.js').OrchestratorSettings}
      */
-    getDocumentationSettings() {
-        return this._documentationSettings;
+    getSettings() {
+        return this._settings;
     }
 }

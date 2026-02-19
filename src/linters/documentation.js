@@ -7,16 +7,34 @@ import path from 'path';
 
 /**
  * Runs documentation check
- * @param {string} [projectRoot='.'] - Path to project root
- * @param {string} [pattern='npm run %s'] - Pattern to check in README (use %s for script name)
- * @param {string} [file='README.md'] - Documentation file to check
+ * @param {import('../orchestrator/orchestrator.js').Orchestrator|string} [orchOrRoot='.'] - Orchestrator instance or project root path
+ * @param {string} [pattern] - Pattern (only if first arg is root path)
+ * @param {string} [file] - File (only if first arg is root path)
  * @returns {Promise<{success: boolean, output: string, label: string}>}
  */
-export function runDocumentationCheck(projectRoot = '.', pattern = 'npm run %s', file = 'README.md') {
+export function runDocumentationCheck(orchOrRoot = '.', pattern, file) {
+    let projectRoot = '.';
+    let checkPattern = 'npm run %s';
+    let checkFile = 'README.md';
+
+    // Check if first argument is an Orchestrator instance
+    if (orchOrRoot && typeof orchOrRoot.getSettings === 'function') {
+        const settings = orchOrRoot.getSettings();
+        if (settings.linters && settings.linters.documentation) {
+            checkPattern = settings.linters.documentation.pattern || checkPattern;
+            checkFile = settings.linters.documentation.file || checkFile;
+        }
+        // Assuming project root is current directory when running via orchestrator
+    } else {
+        projectRoot = orchOrRoot;
+        checkPattern = pattern || checkPattern;
+        checkFile = file || checkFile;
+    }
+
     return new Promise((resolve) => {
         try {
             const packageJsonPath = path.join(projectRoot, 'package.json');
-            const readmePath = path.join(projectRoot, file);
+            const readmePath = path.join(projectRoot, checkFile);
 
             if (!fs.existsSync(packageJsonPath) || !fs.existsSync(readmePath)) {
                 return resolve({
@@ -37,8 +55,7 @@ export function runDocumentationCheck(projectRoot = '.', pattern = 'npm run %s',
             const missingScripts = [];
             scripts.forEach(scriptName => {
                 // Determine expected string based on pattern
-                // Defaut pattern is 'npm run %s'
-                let template = pattern || 'npm run %s';
+                let template = checkPattern;
 
                 // Backwards compatibility: if pattern doesn't contain %s, treat it as a prefix
                 if (!template.includes('%s')) {
