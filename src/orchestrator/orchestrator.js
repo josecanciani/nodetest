@@ -34,6 +34,8 @@ export class Orchestrator extends EventEmitter {
         /** @private */
         this._specificFiles = resolved.files;
         /** @private */
+        this._documentationSettings = resolved.documentation;
+        /** @private */
         this._parallelism = resolved.parallelism;
         /** @private */
         this._preTestCallbacks = [];
@@ -125,5 +127,13 @@ export class Orchestrator extends EventEmitter {
      */
     getParallelism() {
         return this._parallelism;
+    }
+
+    /**
+     * Returns documentation check settings.
+     * @returns {{pattern: string, file: string}}
+     */
+    getDocumentationSettings() {
+        return this._documentationSettings;
     }
 }

@@ -15,7 +15,9 @@ import { runDocumentationCheck } from '../linters/documentation.js';
  * @property {boolean} [forceClean] - Force cleanup phase
  * @property {string[]} [files] - Specific test files (null means auto-discover)
  * @property {number} [parallelism] - Max concurrent preTest tasks
- * @property {Function[]} [linters] - Built-in linter callbacks to register as preTest
+ * @property {{pattern: string, file: string}} [documentation] - Documentation check settings
+ * @property {string} [documentation.pattern] - Pattern for script command (e.g. 'npm run %s')
+ * @property {string} [documentation.file] - Documentation file path (default: README.md)
  */
 
 /** @type {Function[]} */
@@ -23,7 +25,10 @@ const DEFAULT_LINTERS = [
     () => runJsdoc(),
     () => runEslint(),
     () => runJsdocObjectTypeCheck(),
-    () => runDocumentationCheck()
+    (orch) => {
+        const settings = orch.getDocumentationSettings();
+        return runDocumentationCheck('.', settings.pattern, settings.file);
+    }
 ];
 
 /**
@@ -36,7 +41,11 @@ export function getDefaultSettings() {
         forceClean: false,
         files: null,
         parallelism: availableParallelism(),
-        linters: [...DEFAULT_LINTERS]
+        linters: [...DEFAULT_LINTERS],
+        documentation: {
+            pattern: 'npm run %s',
+            file: 'README.md'
+        }
     };
 }
 
@@ -54,7 +63,9 @@ export function mergeSettings(userSettings) {
         forceClean: userSettings.forceClean ?? defaults.forceClean,
         files: userSettings.files !== undefined ? userSettings.files : defaults.files,
         parallelism: userSettings.parallelism ?? defaults.parallelism,
-        linters: userSettings.linters !== undefined ? userSettings.linters : defaults.linters
+        parallelism: userSettings.parallelism ?? defaults.parallelism,
+        linters: userSettings.linters !== undefined ? userSettings.linters : defaults.linters,
+        documentation: { ...defaults.documentation, ...userSettings.documentation }
     };
 }
 

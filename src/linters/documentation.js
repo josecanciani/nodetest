@@ -8,14 +8,15 @@ import path from 'path';
 /**
  * Runs documentation check
  * @param {string} [projectRoot='.'] - Path to project root
- * @param {string} [commandPrefix='./findx'] - Prefix used in README examples
+ * @param {string} [pattern='npm run %s'] - Pattern to check in README (use %s for script name)
+ * @param {string} [file='README.md'] - Documentation file to check
  * @returns {Promise<{success: boolean, output: string, label: string}>}
  */
-export function runDocumentationCheck(projectRoot = '.', commandPrefix = './findx') {
+export function runDocumentationCheck(projectRoot = '.', pattern = 'npm run %s', file = 'README.md') {
     return new Promise((resolve) => {
         try {
             const packageJsonPath = path.join(projectRoot, 'package.json');
-            const readmePath = path.join(projectRoot, 'README.md');
+            const readmePath = path.join(projectRoot, file);
 
             if (!fs.existsSync(packageJsonPath) || !fs.existsSync(readmePath)) {
                 return resolve({
@@ -35,9 +36,16 @@ export function runDocumentationCheck(projectRoot = '.', commandPrefix = './find
             // Check each script
             const missingScripts = [];
             scripts.forEach(scriptName => {
-                // Looking for the command string as it appears in the README table
-                // Example: | `./findx build-base` | ...
-                const expectedString = `${commandPrefix} ${scriptName}`;
+                // Determine expected string based on pattern
+                // Defaut pattern is 'npm run %s'
+                let template = pattern || 'npm run %s';
+
+                // Backwards compatibility: if pattern doesn't contain %s, treat it as a prefix
+                if (!template.includes('%s')) {
+                    template = `${template} %s`;
+                }
+
+                const expectedString = template.replace('%s', scriptName);
 
                 if (!readmeContent.includes(expectedString)) {
                     missingScripts.push(scriptName);
